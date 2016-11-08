@@ -36,6 +36,7 @@ router.get('/mbtiles', function (req, res, next) {
   var right = req.query.right;
   var top = req.query.top;
   var bounds = new Bounds(left, bottom, right, top);
+  var proxy = (req.query['proxy-host'] && req.query['proxy-port']) ? {host: req.query['proxy-host'], port: req.query['proxy-port']} : null;
   
   // Validate Bounds
   if (!ProjectionUtils.isValidBounds(bounds)) {
@@ -62,7 +63,7 @@ router.get('/mbtiles', function (req, res, next) {
   var layer = req.query.layer;
   
   // Wait for promise to be resolved before returning response (synchronous behaviour)
-  mbTilesGeneratorService.requestMBTilesSync(bounds, layer)
+  mbTilesGeneratorService.requestMBTilesSync(bounds, layer, proxy)
       .then(function (result) {
         var content = new Buffer(result, 'binary');
         res.set('Content-Type', 'application/x-sqlite3');
@@ -83,6 +84,7 @@ router.get('/mbtiles/async', function (req, res, next) {
   var right = req.query.right;
   var top = req.query.top;
   var bounds = new Bounds(left, bottom, right, top);
+  var proxy = (req.query['proxy-host'] && req.query['proxy-port']) ? {host: req.query['proxy-host'], port: req.query['proxy-port']} : null;
   
   // Validate Bounds
   if (!ProjectionUtils.isValidBounds(bounds)) {
@@ -109,7 +111,7 @@ router.get('/mbtiles/async', function (req, res, next) {
   var layer = req.query.layer;
   
   // Return token
-  var token = mbTilesGeneratorService.requestMBTiles(bounds, layer);
+  var token = mbTilesGeneratorService.requestMBTiles(bounds, layer, proxy);
   res.set('Content-Type', 'application/json');
   res.send({"token": token});
 });

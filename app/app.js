@@ -63,6 +63,8 @@ if (process.argv.length > 2) {
     console.log('--top=00.000000 (top coordinate in degrees, WGS:84 format valid values: -85.0 to 85.0 .)');
     console.log('--bottom=00.000000 (bottom coordinate in degrees, WGS:84 format valid values: -85.0 to 85.0 .)');
     console.log('Following arguments can be used:');
+    console.log('--proxy-host=127.0.0.1');
+    console.log('--proxy-port=8080');
     console.log('--min-zoom=z (valid values: 0 to 22.)');
     console.log('The minimum zoom level. Will override the default configuration');
     console.log('--max-zoom=z (valid values: 0 to 22 and > min-zoom.)');
@@ -86,9 +88,10 @@ if (process.argv.length > 2) {
   var top = argv['top'];
   var layer = argv['layer'];
   var bounds = new Bounds(left, bottom, right, top);
+  var proxy = (argv['proxy-host'] && argv['proxy-port']) ? {host: argv['proxy-host'], port: argv['proxy-port']} : null;
   // Dirty wait for modules to init.
   setTimeout(function() {
-    mbTilesGeneratorService.requestMBTilesSync(bounds, layer)
+    mbTilesGeneratorService.requestMBTilesSync(bounds, layer, proxy)
         .then(function () {
           process.exit();
         }, function (result) {

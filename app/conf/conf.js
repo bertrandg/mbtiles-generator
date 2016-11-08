@@ -15,7 +15,10 @@
  * MBTiles Generator Configuration
  */
 module.exports = {
-  "tileServer": {"type": "osm", "endpoint": "http://a.tile.openstreetmap.fr/{layer}/{z}/{x}/{y}.png"},
+  "tileServer": {
+    "type": "osm", 
+    "endpoint": "http://osm2vectortiles-0.tileserver.com/v1/{z}/{x}/{y}.png"
+  },
   "minZoom": 4,
   "maxZoom": 17,
   "timeout": 500000, // Timeout in milliseconds

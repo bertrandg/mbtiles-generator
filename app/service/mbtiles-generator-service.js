@@ -48,13 +48,13 @@ function getMapper(type) {
   throw new Error('Wrong tile mapper specified. Please specify an appropriate mapper type in Conf');
 }
 
-var initMBTilesRequest = function() {
+var initMBTilesRequest = function(proxy) {
   // Create temporary sqlite DB file
   var token = uuid.v4();
   var file = 'data/' + token + '.sqlite';
   var db = new sqlite3.Database(file);
   mbTilesStatusService.create(token);
-  return {"db": db, "token": token, "file": file};
+  return {"db": db, "token": token, "file": file, "proxy": proxy};
 };
 
 /**
@@ -63,8 +63,8 @@ var initMBTilesRequest = function() {
  * @param layer the requested layer
  * @returns a string value
  */
-var requestMBTiles = function (bounds, layer) {
-  var request = initMBTilesRequest();
+var requestMBTiles = function (bounds, layer, proxy) {
+  var request = initMBTilesRequest(proxy);
   processMBTiles(request, bounds, layer);
   return request.token;
 };
@@ -75,8 +75,8 @@ var requestMBTiles = function (bounds, layer) {
  * @param layer the requested layer
  * @returns {Promise} the MBTile
  */
-var requestMBTilesSync = function (bounds, layer) {
-  var request = initMBTilesRequest();
+var requestMBTilesSync = function (bounds, layer, proxy) {
+  var request = initMBTilesRequest(proxy);
   return processMBTiles(request, bounds, layer);
 };
 
@@ -118,7 +118,7 @@ var processMBTiles = function (request, bounds, layer) {
           })
           .then(function () {
             // Fetch then store tiles
-            return fetchAndStoreTiles(request.token, bounds, layer, request.db);
+            return fetchAndStoreTiles(request.token, bounds, layer, request.proxy, request.db);
           })
           .then(function () {
             // All tiles have been stored. Close db.
@@ -193,7 +193,7 @@ var insertTile = function (stmt, tile, data, callback) {
  * @param db the database
  * @returns {Promise} a promise resolved when finished.
  */
-var fetchAndStoreTiles = function (token, bounds, layer, db) {
+var fetchAndStoreTiles = function (token, bounds, layer, proxy, db) {
   return new Promise(function (resolve, reject) {
     // List tiles
     var tiles = listTiles(bounds, layer);
@@ -205,7 +205,7 @@ var fetchAndStoreTiles = function (token, bounds, layer, db) {
     for (var s = 0; s < stepCount; s++) {
       var stmt = db.prepare('INSERT INTO tiles VALUES (?, ?, ?, ?)');
       // Use closures to split the tile fetch into sets, to prevent overflows (10000s of http requests at the same time).
-      steps.push(fetchTilesFunction(tiles.slice(s * STEP_REQUEST_SIZE, Math.min((s + 1) * STEP_REQUEST_SIZE, tiles.length)), stmt));
+      steps.push(fetchTilesFunction(tiles.slice(s * STEP_REQUEST_SIZE, Math.min((s + 1) * STEP_REQUEST_SIZE, tiles.length)), stmt, proxy));
       steps.push(finalizeStepFunction(stmt, token, s, stepCount));
     }
     // Last step is resolution
@@ -257,12 +257,12 @@ var listTiles = function (bounds, layer) {
  * @param stmt the statement to run queries in
  * @returns {Function} the function
  */
-var fetchTilesFunction = function (tiles, stmt) {
+var fetchTilesFunction = function (tiles, stmt, proxy) {
   return function () {
     var group = this.group();
     tiles.forEach(function (t) {
       var next = group();
-      fetchTile(t, 0, function (data) {
+      fetchTile(t, proxy, 0, function (data) {
         // Once fetch is done, store tile
         insertTile(stmt, t, data, next);
       });
@@ -293,9 +293,21 @@ var finalizeStepFunction = function (stmt, token, s, stepCount) {
  * @param attempts the number of failed attempts (< 3)
  * @param callback the callback once tile is fetched
  */
-var fetchTile = function (t, attempts, callback) {
+var fetchTile = function (t, proxy, attempts, callback) {
   var url = mapper.getTileUrl(t);
-  debug("Getting " + url);
+
+  if(proxy) {
+    url = {
+      host: proxy.host,
+      port: proxy.port,
+      path: url
+    }
+    debug("Getting " + url.path + " with proxy " + url.host + ":" + url.port);
+  }
+  else {
+    debug("Getting " + url);
+  }
+
   http.get(url, function (res) {
     if (res.statusCode == 200) {
       res.setEncoding('base64');
@@ -313,14 +325,14 @@ var fetchTile = function (t, attempts, callback) {
       console.error('Received error from server' + JSON.stringify(error));
       // Will retry 3 times if error occured (maybe tile is not ready yet), fail beyond.
       if (attempts < 3) {
-        fetchTile(t, attempts++, callback);
+        fetchTile(t, proxy, attempts++, callback);
       }
     }
   }).on('error', function (err) {
     console.error('Received error from server' + JSON.stringify(err));
     // Will retry 3 times if error occured (maybe tile is not ready yet), fail beyond.
     if (attempts < 3) {
-      fetchTile(t, attempts++, callback);
+      fetchTile(t, proxy, attempts++, callback);
     }
   });
 };
