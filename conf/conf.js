@@ -15,9 +15,12 @@
  * MBTiles Generator Configuration
  */
 module.exports = {
-  "tileServer": {"type": "${tileServer.type}", "endpoint": "${tileServer.endpoint}"},
-  "minZoom": ${minZoom},
-  "maxZoom": ${maxZoom}, 
-  "timeout": ${timeout}000, // Timeout in milliseconds
-  "maxArea": ${maxArea},
+  "tileServer": {
+    "type": "osm", 
+    "endpoint": "http://osm2vectortiles-0.tileserver.com/v1/{z}/{x}/{y}.png"
+  },
+  "minZoom": 4,
+  "maxZoom": 12,
+  "timeout": 500000, // Timeout in milliseconds
+  "maxArea": 12 // Maximum area, in square kilometers
 };
